@@ -1,47 +1,49 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
     SafeAreaView,
     Text,
     View,
     StyleSheet,
     TextInput,
-    FlatList
+    FlatList,
+    BackHandler
 }from 'react-native';
-import { Icon } from 'react-native-elements'
+import { Icon } from 'react-native-elements';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const customData = require('../data/words.json');
 
 const Home = ({navigation}) =>{
 
+
+
     const [input, setInput] = useState('');
-    const [words, setWords] = useState();
-    const [flag, setFlag] = useState(false)
     const [foundWords, setFoundWords] = useState([]);
+    const [hide, setHide] = useState('flex');
+    const [username, setUsername] = useState('');
+
+    const getData = async () => {
+        try {
+          const value = await AsyncStorage.getItem('@storage_Key')
+          if(value !== null) {
+            setUsername(value)
+            
+          }
+        } catch(e) {
+          console.log("No username.")
+          
+        }
+      }
+
+    const inputEl = useRef(null);
 
     const didType = (prop) =>{
         setInput(prop)
         if(prop != ""){
-          setFlag(true)
+          findWord(prop)
         }else{
-          setFlag(false)
+          setFoundWords([])
         }
-      }
-    
-      const renderWords = () =>{
-        return customData.words.map((data, index) =>{
-          return <Text key={index} style={styles.word}>{data.word}</Text>
-        })
-      }
-    
-      const renderSerached = (found) =>{
-    
-        console.log("Found : ")
-        console.log(found)
-    
-    
-        return found.map((data, index) =>{
-          console.log(data.word)
-          return <Text key={index} style={styles.word}>{data.word}</Text>;
-        })
-    
       }
     
       const findWord = (input) =>{
@@ -54,10 +56,31 @@ const Home = ({navigation}) =>{
             }
             
           });
-          return renderSerached(found)   
+          setFoundWords(found)
       }
 
-    console.log("Loaded!")
+      const hideItems = (prop) =>{
+          if(prop === true){
+              setHide('none')
+          }else{
+              setHide('flex')
+          }
+      }
+
+      function handleBackButtonClick() {
+        setHide('flex')
+        return true;
+      }
+    
+      useEffect(() => {
+
+        getData();
+
+        BackHandler.addEventListener('hardwareBackPress', handleBackButtonClick);
+        return () => {
+          BackHandler.removeEventListener('hardwareBackPress', handleBackButtonClick);
+        };
+      }, []);
     return(
         <SafeAreaView style={styles.mainContainer}> 
             <View style={styles.headerContainer}>
@@ -65,48 +88,31 @@ const Home = ({navigation}) =>{
                     name='ellipsis-h'
                     type='font-awesome-5'
                     iconStyle={styles.menuIcon}
-                    onPress={() => console.log('hello')} 
+                    onPress={() => navigation.openDrawer()} 
                 />
                 <Text style={styles.headerText}>LatinApp</Text>
                 <Icon
                     name='search'
                     type='font-awesome-5'
                     iconStyle={styles.menuIcon}
-                    onPress={() => console.log('hello')} 
+                    onPress={() => inputEl.current.focus()} 
                 />
             </View>
-            <View style={styles.headerWelcome}>
+            <View style={[styles.headerWelcome, {display: hide}]}>
                 <View style={styles.welcomeLeft}>
-                    <Text style={styles.welcomeName}>Hi Emin!</Text>
-                    <Text style={styles.welcomeBack}>Welcome back</Text>
+                    <Text style={styles.welcomeName}>Hi {username}!</Text>
+                    <Text style={styles.welcomeBack}>Welcome back!</Text>
                 </View>
                 <View style={styles.welcomeRight}>
                     <View style={styles.welcomeAvatar}>
-                        <Text style={styles.welcomeAvatarText}>E</Text>
+                        <Text style={styles.welcomeAvatarText}>{username.charAt(0)}</Text>
                     </View>
                 </View>
             </View>
             <View style={styles.translatedContainer}>
                 <FlatList
-                 data={[
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                     {key: 'prevedena rijec'},
-                 ]}
-                 renderItem={({item}) => <Text style={styles.translatedWord}>{item.key}</Text>}
+                 data={foundWords}
+                 renderItem={({item}) => <Text style={styles.translatedWord}>{item.word}</Text>}
                 />
             </View>
             <View style={styles.inputContainer}>
@@ -115,9 +121,12 @@ const Home = ({navigation}) =>{
                 placeholder="Unesite rijec"
                 onChangeText={input => didType(input)}
                 defaultValue={input}
+                onFocus={() => hideItems(true)}
+                onBlur={() => hideItems(false)}
+                ref={inputEl}
             />
             </View>
-            <View style={styles.footerContainer}>
+            <View style={[styles.footerContainer, {display: hide}]}>
                 <Text style={styles.footerText}>Bosanski</Text>
                 <View style={styles.circleContainer}>
                     <Icon
@@ -154,25 +163,30 @@ const styles = StyleSheet.create({
     },
     headerText:{
         fontSize: 25,
-        height: 30
+        height: 30,
+        fontFamily: 'Roboto'
     },
     headerWelcome:{
-        flex:1,
+        height: 100,
         display: 'flex',
         flexDirection: 'row',
         justifyContent:'space-between',
         marginLeft: 20,
-        marginRight: 20
+        marginRight: 20,
+        marginBottom: 10
     },
     welcomeLeft:{
         display:'flex',
         justifyContent:'center'
     },
     welcomeName:{
-        fontSize: 20
+        fontSize: 20,
     },
     welcomeBack:{
-        fontSize: 20
+        fontSize: 25,
+        lineHeight: 27,
+        fontWeight: '700',
+        color: '#000'
     },
     welcomeRight:{
         display:'flex',
@@ -183,13 +197,14 @@ const styles = StyleSheet.create({
         heigh: 50,
         borderRadius: 100,
         backgroundColor: '#0984e3',
-        display:'flex',
+        display: 'flex',
         alignItems:'center'
     },
     welcomeAvatarText:{
         fontSize: 25,
         padding: 10,
-        color: '#fff'
+        color: '#fff',
+        textTransform: 'uppercase'
     },
     scrollContainer:{
         height: 300
@@ -212,7 +227,7 @@ const styles = StyleSheet.create({
         fontSize: 20
     },
     inputContainer:{
-        flex: 3,
+        flex: 0,
         display: 'flex',
         marginLeft: 20,
         marginRight: 20,
@@ -251,13 +266,14 @@ const styles = StyleSheet.create({
         borderRadius: 100,
         display: 'flex',
         justifyContent: 'center',
-        backgroundColor: '#2e2e2e'
+        backgroundColor: '#2e2e2e',
+        marginRight: 25
     },
     footerIcon:{
         fontSize: 30,
-        color: '#f7f7f7'
+        color: '#f7f7f7',
     }
 
-})
+});
 
 export default Home;
